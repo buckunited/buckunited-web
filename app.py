@@ -18,14 +18,12 @@ def calculate_payoff(debts, monthly_budget, strategy="avalanche"):
     while sum(balances.values()) > 0:
         months_elapsed += 1
         
-        # FATAL CRASH GUARD: If it takes over 100 years, kill the loop.
         if months_elapsed > 1200:
             return {"error": "Budget too low"}
             
         remaining_budget = monthly_budget
         active_this_month = [name for name, bal in balances.items() if bal > 0]
         
-        # 1. Apply Interest
         monthly_interest_generated = 0
         for name in balances:
             if balances[name] > 0:
@@ -34,11 +32,9 @@ def calculate_payoff(debts, monthly_budget, strategy="avalanche"):
                 monthly_interest_generated += interest
                 total_interest += interest
 
-        # CRASH GUARD: If budget can't even cover the interest, it will loop forever. Stop immediately.
         if remaining_budget <= monthly_interest_generated and sum(balances.values()) > 0:
             return {"error": "Budget too low"}
 
-        # 2. Make Payments
         for name in balances:
             if balances[name] <= 0: continue
             if remaining_budget >= balances[name]:
@@ -85,7 +81,7 @@ def find_required_budget(debts, target_months, strategy="avalanche"):
             
     return best_budget
 
-# --- PREMIUM HYBRID HTML REPORT GENERATOR ---
+# --- PREMIUM HTML REPORT GENERATOR (BULLETPROOF STRING REPLACEMENT) ---
 def generate_html_report(portfolio, result, strategy, view_mode, required_daily=0, required_monthly=0):
     
     portfolio_rows = ""
@@ -113,8 +109,8 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
     daily_str = f"${required_daily:,.2f}" if view_mode == "Target" else "N/A"
     monthly_str = f"${required_monthly:,.2f}" if view_mode == "Target" else "N/A"
 
-    # Fully syntax-escaped HTML F-string
-    html_content = f"""
+    # STANDARD STRING: No "f" at the beginning, so Python ignores all CSS brackets.
+    html_template = """
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -123,28 +119,32 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
         <title>BuckUnited Master Plan</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <style>
-            body {{ background-color: #e5e7eb; display: flex; justify-content: center; padding: 2rem; font-family: 'Helvetica Neue', sans-serif; color: #1f2937; }}
-            .a4-sheet {{ width: 210mm; min-height: 297mm; background: white; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); padding: 15mm 20mm; position: relative; margin-bottom: 2rem; }}
-            @media print {{
-                body {{ background: white; padding: 0; }}
-                .a4-sheet {{ width: 210mm; height: 297mm; box-shadow: none; margin: 0; padding: 15mm; page-break-after: always; }}
-                @page {{ size: A4 portrait; margin: 0; }}
-                .no-print {{ display: none !important; }}
-                tr {{ page-break-inside: avoid; }} 
-            }}
-            table {{ width: 100%; border-collapse: collapse; margin-top: 5px; }}
-            th, td {{ border: 1px solid #9ca3af; padding: 6px 8px; text-align: left; font-size: 0.875rem; }}
-            th {{ background-color: #f3f4f6; font-weight: bold; color: #374151; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }}
-            .blank-row td {{ height: 31px; }}
-            .fill-line {{ border-bottom: 1px solid #6b7280; flex-grow: 1; margin-left: 8px; }}
-            .portfolio-table {{ width: 100%; border-collapse: collapse; margin-top: 0; border: none; }}
-            .portfolio-table th, .portfolio-table td {{ border: none; border-bottom: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; }}
-            .portfolio-table th {{ background-color: #f8fafc; font-weight: bold; color: #475569; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; }}
-            .portfolio-table tr:last-child td {{ border-bottom: none; }}
-            .watermark-container {{ position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); width: 80%; text-align: center; opacity: 0.05; pointer-events: none; z-index: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }}
-            .watermark-main {{ font-size: 8rem; font-weight: 900; color: #111827; letter-spacing: -0.05em; line-height: 1; white-space: nowrap; }}
-            .watermark-sub {{ font-size: 2rem; font-weight: 700; color: #374151; letter-spacing: 0.3em; text-transform: uppercase; margin-top: -10px; }}
-            .content-layer {{ position: relative; z-index: 10; }}
+            body { background-color: #e5e7eb; display: flex; justify-content: center; padding: 2rem; font-family: 'Helvetica Neue', sans-serif; color: #1f2937; }
+            .a4-sheet { width: 210mm; min-height: 297mm; background: white; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); padding: 15mm 20mm; position: relative; margin-bottom: 2rem; }
+            
+            @media print {
+                body { background: white; padding: 0; }
+                .a4-sheet { width: 210mm; height: 297mm; box-shadow: none; margin: 0; padding: 15mm; page-break-after: always; }
+                @page { size: A4 portrait; margin: 0; }
+                .no-print { display: none !important; }
+                tr { page-break-inside: avoid; } 
+            }
+            
+            table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+            th, td { border: 1px solid #9ca3af; padding: 6px 8px; text-align: left; font-size: 0.875rem; }
+            th { background-color: #f3f4f6; font-weight: bold; color: #374151; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }
+            .blank-row td { height: 31px; }
+            .fill-line { border-bottom: 1px solid #6b7280; flex-grow: 1; margin-left: 8px; }
+
+            .portfolio-table { width: 100%; border-collapse: collapse; margin-top: 0; border: none; }
+            .portfolio-table th, .portfolio-table td { border: none; border-bottom: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; }
+            .portfolio-table th { background-color: #f8fafc; font-weight: bold; color: #475569; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; }
+            .portfolio-table tr:last-child td { border-bottom: none; }
+            
+            .watermark-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); width: 80%; text-align: center; opacity: 0.05; pointer-events: none; z-index: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+            .watermark-main { font-size: 8rem; font-weight: 900; color: #111827; letter-spacing: -0.05em; line-height: 1; white-space: nowrap; }
+            .watermark-sub { font-size: 2rem; font-weight: 700; color: #374151; letter-spacing: 0.3em; text-transform: uppercase; margin-top: -10px; }
+            .content-layer { position: relative; z-index: 10; }
         </style>
     </head>
     <body>
@@ -153,11 +153,13 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
                 🖨️ Print Master Plan
             </button>
         </div>
+
         <div class="a4-sheet">
             <div class="watermark-container">
                 <div class="watermark-main">BUCKUNITED</div>
                 <div class="watermark-sub">FINANCIAL</div>
             </div>
+            
             <div class="content-layer">
                 <div class="border-b-2 border-gray-800 pb-2 mb-4 flex justify-between items-end">
                     <div>
@@ -173,27 +175,27 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
                 <div class="grid grid-cols-2 gap-x-12 gap-y-4 mb-6 bg-gray-50 p-4 border border-gray-200 rounded-sm">
                     <div class="flex items-end">
                         <span class="font-bold text-sm whitespace-nowrap w-36 text-gray-700">Methodology:</span>
-                        <span class="text-sm ml-2 font-medium text-gray-800">{strategy.title()}</span>
+                        <span class="text-sm ml-2 font-medium text-gray-800">__STRATEGY__</span>
                     </div>
                     <div class="flex items-end">
                         <span class="font-bold text-sm whitespace-nowrap w-36 text-gray-700">Daily Target:</span>
-                        <span class="text-sm ml-2 font-medium text-gray-800">{daily_str}</span>
+                        <span class="text-sm ml-2 font-medium text-gray-800">__DAILY__</span>
                     </div>
                     <div class="flex items-end">
                         <span class="font-bold text-sm whitespace-nowrap w-36 text-gray-700">Timeline:</span>
-                        <span class="text-sm ml-2 font-medium text-gray-800">{result['months_to_freedom']} Months</span>
+                        <span class="text-sm ml-2 font-medium text-gray-800">__MONTHS__ Months</span>
                     </div>
                     <div class="flex items-end">
                         <span class="font-bold text-sm whitespace-nowrap w-36 text-gray-700">Monthly Target:</span>
-                        <span class="text-sm ml-2 font-medium text-gray-800">{monthly_str}</span>
+                        <span class="text-sm ml-2 font-medium text-gray-800">__MONTHLY__</span>
                     </div>
                     <div class="flex items-end">
                         <span class="font-bold text-sm whitespace-nowrap w-36 text-gray-700">Total Starting Debt:</span>
-                        <span class="text-sm ml-2 font-bold text-indigo-600">${result['starting_total_debt']:,.2f}</span>
+                        <span class="text-sm ml-2 font-bold text-indigo-600">__STARTING__</span>
                     </div>
                     <div class="flex items-end">
                         <span class="font-bold text-sm whitespace-nowrap w-36 text-gray-700">Total Interest Paid:</span>
-                        <span class="text-sm ml-2 font-medium text-gray-800">${result['total_interest_paid']:,.2f}</span>
+                        <span class="text-sm ml-2 font-medium text-gray-800">__INTEREST__</span>
                     </div>
                 </div>
 
@@ -208,7 +210,7 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
                             </tr>
                         </thead>
                         <tbody>
-                            {portfolio_rows}
+                            __PORTFOLIO_ROWS__
                         </tbody>
                     </table>
                 </div>
@@ -225,17 +227,28 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
                         </tr>
                     </thead>
                     <tbody>
-                        {table_rows}
+                        __TABLE_ROWS__
                     </tbody>
                 </table>
                 <div class="mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-500">
-                    <p>Track your live progress and visualize your trajectory at <b>buckunited-web-km98v3cnxqxunrp4nj7ylr.streamlit.app</b></p>
+                    <p>Track your live progress and visualize your trajectory at <b>buckunited-web.streamlit.app</b></p>
                 </div>
             </div>
         </div>
     </body>
     </html>
     """
+
+    # Safe data injection
+    html_content = html_template.replace("__STRATEGY__", strategy.title())
+    html_content = html_content.replace("__DAILY__", daily_str)
+    html_content = html_content.replace("__MONTHS__", str(result['months_to_freedom']))
+    html_content = html_content.replace("__MONTHLY__", monthly_str)
+    html_content = html_content.replace("__STARTING__", f"${result['starting_total_debt']:,.2f}")
+    html_content = html_content.replace("__INTEREST__", f"${result['total_interest_paid']:,.2f}")
+    html_content = html_content.replace("__PORTFOLIO_ROWS__", portfolio_rows)
+    html_content = html_content.replace("__TABLE_ROWS__", table_rows)
+
     return html_content.encode('utf-8')
 
 # --- PREMIUM INTERACTIVE GRAPH ---
@@ -372,7 +385,6 @@ if len(st.session_state.portfolio) > 0:
         
         target_result = calculate_payoff(target_portfolio, required_monthly, active_strat)
         
-        # CRASH GUARD FOR TARGET VIEW
         if "error" in target_result:
             st.error("⚠️ Mathematical limit reached. Either the timeline is too aggressive, or the budget required is too high. Please extend your timeline.")
         else:
