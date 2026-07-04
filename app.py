@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import datetime
 import io
+import plotly.graph_objects as go
 
 # --- CORE MATH ENGINE ---
 def calculate_payoff(debts, monthly_budget, strategy="avalanche"):
@@ -67,20 +68,17 @@ def find_required_budget(debts, target_months, strategy="avalanche"):
 
 # --- EXCEL REPORT GENERATOR ---
 def generate_excel_report(portfolio, result, strategy, view_mode, required_daily=0, required_monthly=0):
-    """Builds a highly formatted, A4-centered Excel file."""
     output = io.BytesIO()
     
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         workbook = writer.book
         worksheet = workbook.add_worksheet('BuckUnited Plan')
         
-        # 1. Hide gridlines and set strict A4 Print Settings
         worksheet.hide_gridlines(2)
-        worksheet.set_paper(9) # A4 Paper Size
-        worksheet.center_horizontally() # Centers the table on the printed page
-        worksheet.fit_to_pages(1, 0) # Forces it to be exactly 1 page wide
+        worksheet.set_paper(9) 
+        worksheet.center_horizontally() 
+        worksheet.fit_to_pages(1, 0) 
         
-        # 2. Define Styles (EVERYTHING IS NOW CENTERED)
         brand_format = workbook.add_format({'bold': True, 'font_size': 24, 'bg_color': '#0F172A', 'font_color': '#FFFFFF', 'align': 'center', 'valign': 'vcenter'})
         subtitle_format = workbook.add_format({'italic': True, 'font_size': 12, 'bg_color': '#0F172A', 'font_color': '#94A3B8', 'align': 'center', 'valign': 'vcenter'})
         header_format = workbook.add_format({'bold': True, 'font_size': 14, 'bottom': 2, 'bottom_color': '#333333', 'font_color': '#0F172A', 'align': 'center', 'valign': 'vcenter'})
@@ -89,17 +87,13 @@ def generate_excel_report(portfolio, result, strategy, view_mode, required_daily
         text_format = workbook.add_format({'font_size': 12, 'font_color': '#0F172A', 'align': 'center', 'valign': 'vcenter'})
         center_box = workbook.add_format({'align': 'center', 'valign': 'vcenter', 'font_size': 16, 'font_color': '#64748B'})
         
-        # 3. Set Column Widths evenly for A4
         worksheet.set_column('A:A', 15)
         worksheet.set_column('B:B', 20)
         worksheet.set_column('C:C', 25)
         worksheet.set_column('D:D', 20)
         
-        # --- SECTION: BRANDING ---
         worksheet.merge_range('A1:D2', 'BUCKUNITED', brand_format)
         worksheet.merge_range('A3:D3', 'FINANCIAL ACTION PLAN', subtitle_format)
-        
-        # --- SECTION: SUMMARY ---
         worksheet.merge_range('A5:D5', 'STRATEGY SUMMARY', header_format)
         
         worksheet.write('A7', 'Methodology:', bold_label)
@@ -115,9 +109,7 @@ def generate_excel_report(portfolio, result, strategy, view_mode, required_daily
             worksheet.write('C9', 'Monthly Target:', bold_label)
             worksheet.write('D9', required_monthly, money_format)
             
-        # --- SECTION: THE CHECKLIST ---
         worksheet.merge_range('A12:D12', 'MONTHLY EXECUTION CHECKLIST', header_format)
-        
         worksheet.write('A14', 'Status', bold_label)
         worksheet.write('B14', 'Month', bold_label)
         worksheet.write('C14', 'Remaining Target', bold_label)
@@ -132,6 +124,34 @@ def generate_excel_report(portfolio, result, strategy, view_mode, required_daily
             row += 1
             
     return output.getvalue()
+
+# --- PREMIUM INTERACTIVE GRAPH ---
+def draw_pro_chart(timeline):
+    months = [t['month'] for t in timeline]
+    balances = [t['remaining_total_debt'] for t in timeline]
+    
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=months, y=balances,
+        fill='tozeroy',
+        mode='lines+markers',
+        line=dict(color='#10B981', width=3), 
+        fillcolor='rgba(16, 185, 129, 0.15)', 
+        marker=dict(size=8, color='#0F172A', line=dict(width=2, color='#10B981')),
+        hovertemplate="Month: %{x}<br>Balance: $%{y:,.2f}<extra></extra>"
+    ))
+    
+    fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=0, r=0, t=10, b=0),
+        xaxis=dict(showgrid=True, gridcolor='#1E293B', title="Timeline (Months)", color='#94A3B8'),
+        yaxis=dict(showgrid=True, gridcolor='#1E293B', tickprefix="$", color='#94A3B8'),
+        hovermode="x unified",
+        font=dict(color='#94A3B8')
+    )
+    # Renders perfectly on mobile devices
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}) 
 
 # --- UI SETUP ---
 st.set_page_config(page_title="BuckUnited Intake", layout="wide")
@@ -216,7 +236,9 @@ if len(st.session_state.portfolio) > 0:
             c1, c2 = st.columns(2)
             c1.metric("Months to Debt-Free", result['months_to_freedom'])
             c2.metric("Total Interest Paid", f"${result['total_interest_paid']}")
-            st.area_chart(pd.DataFrame(result['timeline']).set_index('month'))
+            
+            # ---> THE NEW GRAPH <---
+            draw_pro_chart(result['timeline'])
             
             st.divider()
             st.markdown("### 🖨️ Your Action Plan")
@@ -242,7 +264,9 @@ if len(st.session_state.portfolio) > 0:
         c2.metric("Required Monthly Equivalent", f"${required_monthly:.2f} / mo")
         
         target_result = calculate_payoff(target_portfolio, required_monthly, active_strat)
-        st.area_chart(pd.DataFrame(target_result['timeline']).set_index('month'))
+        
+        # ---> THE NEW GRAPH <---
+        draw_pro_chart(target_result['timeline'])
 
         st.divider()
         st.markdown("### 🖨️ Your Action Plan")
