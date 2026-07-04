@@ -1,7 +1,5 @@
 import streamlit as st
-import pandas as pd
 import datetime
-import io
 import plotly.graph_objects as go
 
 # --- CORE MATH ENGINE ---
@@ -66,64 +64,133 @@ def find_required_budget(debts, target_months, strategy="avalanche"):
             
     return best_budget
 
-# --- EXCEL REPORT GENERATOR ---
-def generate_excel_report(portfolio, result, strategy, view_mode, required_daily=0, required_monthly=0):
-    output = io.BytesIO()
-    
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        workbook = writer.book
-        worksheet = workbook.add_worksheet('BuckUnited Plan')
-        
-        worksheet.hide_gridlines(2)
-        worksheet.set_paper(9) 
-        worksheet.center_horizontally() 
-        worksheet.fit_to_pages(1, 0) 
-        
-        brand_format = workbook.add_format({'bold': True, 'font_size': 24, 'bg_color': '#0F172A', 'font_color': '#FFFFFF', 'align': 'center', 'valign': 'vcenter'})
-        subtitle_format = workbook.add_format({'italic': True, 'font_size': 12, 'bg_color': '#0F172A', 'font_color': '#94A3B8', 'align': 'center', 'valign': 'vcenter'})
-        header_format = workbook.add_format({'bold': True, 'font_size': 14, 'bottom': 2, 'bottom_color': '#333333', 'font_color': '#0F172A', 'align': 'center', 'valign': 'vcenter'})
-        bold_label = workbook.add_format({'bold': True, 'font_size': 12, 'font_color': '#334155', 'align': 'center', 'valign': 'vcenter'})
-        money_format = workbook.add_format({'num_format': '$#,##0.00', 'font_size': 12, 'font_color': '#0F172A', 'align': 'center', 'valign': 'vcenter'})
-        text_format = workbook.add_format({'font_size': 12, 'font_color': '#0F172A', 'align': 'center', 'valign': 'vcenter'})
-        center_box = workbook.add_format({'align': 'center', 'valign': 'vcenter', 'font_size': 16, 'font_color': '#64748B'})
-        
-        worksheet.set_column('A:A', 15)
-        worksheet.set_column('B:B', 20)
-        worksheet.set_column('C:C', 25)
-        worksheet.set_column('D:D', 20)
-        
-        worksheet.merge_range('A1:D2', 'BUCKUNITED', brand_format)
-        worksheet.merge_range('A3:D3', 'FINANCIAL ACTION PLAN', subtitle_format)
-        worksheet.merge_range('A5:D5', 'STRATEGY SUMMARY', header_format)
-        
-        worksheet.write('A7', 'Methodology:', bold_label)
-        worksheet.write('B7', strategy.title(), text_format)
-        worksheet.write('A8', 'Timeline:', bold_label)
-        worksheet.write('B8', f"{result['months_to_freedom']} Months", text_format)
-        worksheet.write('A9', 'Total Interest:', bold_label)
-        worksheet.write('B9', result['total_interest_paid'], money_format)
-        
-        if view_mode == "Target":
-            worksheet.write('C8', 'Daily Target:', bold_label)
-            worksheet.write('D8', required_daily, money_format)
-            worksheet.write('C9', 'Monthly Target:', bold_label)
-            worksheet.write('D9', required_monthly, money_format)
+# --- PREMIUM HYBRID HTML REPORT GENERATOR ---
+def generate_html_report(portfolio, result, strategy, view_mode, required_daily=0, required_monthly=0):
+    # 1. Build the dynamic rows (Using Design 1's structured table layout)
+    table_rows = ""
+    for item in result['timeline']:
+        table_rows += f"""
+        <tr class="blank-row">
+            <td class="text-center text-gray-400 text-lg">☐</td>
+            <td class="text-center text-sm">Month {item['month']}</td>
+            <td class="text-center font-mono text-sm">${item['remaining_total_debt']:,.2f}</td>
+            <td></td>
+        </tr>
+        """
+
+    # 2. Handle the Target vs Standard view numbers
+    daily_str = f"${required_daily:,.2f}" if view_mode == "Target" else "N/A"
+    monthly_str = f"${required_monthly:,.2f}" if view_mode == "Target" else "N/A"
+
+    # 3. Inject into the Hybrid Template
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>BuckUnited Master Plan</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+            /* Base styling */
+            body {{ background-color: #e5e7eb; display: flex; justify-content: center; padding: 2rem; font-family: 'Helvetica Neue', sans-serif; color: #1f2937; }}
+            .a4-sheet {{ width: 210mm; min-height: 297mm; background: white; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); padding: 15mm 20mm; position: relative; margin-bottom: 2rem; }}
             
-        worksheet.merge_range('A12:D12', 'MONTHLY EXECUTION CHECKLIST', header_format)
-        worksheet.write('A14', 'Status', bold_label)
-        worksheet.write('B14', 'Month', bold_label)
-        worksheet.write('C14', 'Remaining Target', bold_label)
-        worksheet.write('D14', 'Notes', bold_label) 
-        
-        row = 15
-        for item in result['timeline']:
-            worksheet.write(row, 0, '☐', center_box) 
-            worksheet.write(row, 1, f"Month {item['month']}", text_format)
-            worksheet.write(row, 2, item['remaining_total_debt'], money_format)
-            worksheet.write(row, 3, '', text_format) 
-            row += 1
+            /* Print rules to handle 30+ months perfectly */
+            @media print {{
+                body {{ background: white; padding: 0; }}
+                .a4-sheet {{ width: 210mm; height: 297mm; box-shadow: none; margin: 0; padding: 15mm; page-break-after: always; }}
+                @page {{ size: A4 portrait; margin: 0; }}
+                .no-print {{ display: none !important; }}
+                tr {{ page-break-inside: avoid; }} 
+            }}
             
-    return output.getvalue()
+            /* Strict Table Styling */
+            table {{ width: 100%; border-collapse: collapse; margin-top: 5px; }}
+            th, td {{ border: 1px solid #9ca3af; padding: 6px 8px; text-align: left; font-size: 0.875rem; }}
+            th {{ background-color: #f3f4f6; font-weight: bold; color: #374151; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }}
+            .blank-row td {{ height: 31px; }}
+            .fill-line {{ border-bottom: 1px solid #6b7280; flex-grow: 1; margin-left: 8px; }}
+            
+            /* The Watermark */
+            .watermark-container {{ position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); width: 80%; text-align: center; opacity: 0.05; pointer-events: none; z-index: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }}
+            .watermark-main {{ font-size: 8rem; font-weight: 900; color: #111827; letter-spacing: -0.05em; line-height: 1; white-space: nowrap; }}
+            .watermark-sub {{ font-size: 2rem; font-weight: 700; color: #374151; letter-spacing: 0.3em; text-transform: uppercase; margin-top: -10px; }}
+            .content-layer {{ position: relative; z-index: 10; }}
+        </style>
+    </head>
+    <body>
+        <div class="fixed top-6 right-6 no-print z-50">
+            <button onclick="window.print()" class="bg-indigo-600 text-white px-6 py-2.5 rounded-lg shadow-lg hover:bg-indigo-700 transition font-semibold">
+                🖨️ Print Master Plan
+            </button>
+        </div>
+
+        <div class="a4-sheet">
+            <div class="watermark-container">
+                <div class="watermark-main">BUCKUNITED</div>
+                <div class="watermark-sub">FINANCIAL</div>
+            </div>
+            
+            <div class="content-layer">
+                <div class="border-b-2 border-gray-800 pb-2 mb-4 flex justify-between items-end">
+                    <div>
+                        <p class="text-xs font-bold text-indigo-600 tracking-widest mb-1">BUCKUNITED</p> 
+                        <h1 class="text-2xl font-black uppercase tracking-wider text-gray-900">Master Financial Action Plan</h1>
+                    </div>
+                    <div class="text-right no-print">
+                        <span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">A4 Standard Format</span>
+                    </div>
+                </div>
+
+                <h2 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Strategy Overview</h2>
+                <div class="grid grid-cols-2 gap-x-12 gap-y-4 mb-6 bg-gray-50 p-4 border border-gray-200 rounded-sm">
+                    <div class="flex items-end">
+                        <span class="font-bold text-sm whitespace-nowrap w-28">Methodology:</span>
+                        <span class="text-sm ml-2 font-medium text-gray-800">{strategy.title()}</span>
+                    </div>
+                    <div class="flex items-end">
+                        <span class="font-bold text-sm whitespace-nowrap w-28">Daily Target:</span>
+                        <span class="text-sm ml-2 font-medium text-gray-800">{daily_str}</span>
+                    </div>
+                    <div class="flex items-end">
+                        <span class="font-bold text-sm whitespace-nowrap w-28">Timeline:</span>
+                        <span class="text-sm ml-2 font-medium text-gray-800">{result['months_to_freedom']} Months</span>
+                    </div>
+                    <div class="flex items-end">
+                        <span class="font-bold text-sm whitespace-nowrap w-28">Monthly Target:</span>
+                        <span class="text-sm ml-2 font-medium text-gray-800">{monthly_str}</span>
+                    </div>
+                    <div class="flex items-end">
+                        <span class="font-bold text-sm whitespace-nowrap w-28">Total Interest:</span>
+                        <span class="text-sm ml-2 font-medium text-gray-800">${result['total_interest_paid']:,.2f}</span>
+                    </div>
+                </div>
+
+                <h2 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Execution Checklist</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="w-12 text-center">Status</th>
+                            <th class="w-24 text-center">Timeline</th>
+                            <th class="w-32 text-center">Remaining Debt</th>
+                            <th class="w-auto text-left">Notes / Actual Paid</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {table_rows}
+                    </tbody>
+                </table>
+                
+                <div class="mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-500">
+                    <p>Track your live progress and visualize your trajectory at <b>buckunited-web-km98v3cnxqxunrp4nj7ylr.streamlit.app</b></p>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return html_content.encode('utf-8')
 
 # --- PREMIUM INTERACTIVE GRAPH ---
 def draw_pro_chart(timeline):
@@ -150,7 +217,6 @@ def draw_pro_chart(timeline):
         hovermode="x unified",
         font=dict(color='#94A3B8')
     )
-    # Renders perfectly on mobile devices
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}) 
 
 # --- UI SETUP ---
@@ -237,13 +303,12 @@ if len(st.session_state.portfolio) > 0:
             c1.metric("Months to Debt-Free", result['months_to_freedom'])
             c2.metric("Total Interest Paid", f"${result['total_interest_paid']}")
             
-            # ---> THE NEW GRAPH <---
             draw_pro_chart(result['timeline'])
             
             st.divider()
             st.markdown("### 🖨️ Your Action Plan")
-            excel_data = generate_excel_report(st.session_state.portfolio, result, active_strat, "Standard")
-            st.download_button("📊 Download Pro Action Plan (Excel)", data=excel_data, file_name='BuckUnited_Action_Plan.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', type="primary")
+            html_data = generate_html_report(st.session_state.portfolio, result, active_strat, "Standard")
+            st.download_button("🖨️ Download Master Plan (HTML)", data=html_data, file_name='BuckUnited_Master_Plan.html', mime='text/html', type="primary")
 
     # --- TARGET VIEW ---
     elif st.session_state.view_mode == "Target":
@@ -265,10 +330,9 @@ if len(st.session_state.portfolio) > 0:
         
         target_result = calculate_payoff(target_portfolio, required_monthly, active_strat)
         
-        # ---> THE NEW GRAPH <---
         draw_pro_chart(target_result['timeline'])
 
         st.divider()
         st.markdown("### 🖨️ Your Action Plan")
-        excel_data = generate_excel_report(target_portfolio, target_result, active_strat, "Target", required_daily, required_monthly)
-        st.download_button("📊 Download Pro Action Plan (Excel)", data=excel_data, file_name='BuckUnited_Action_Plan.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', type="primary", key="target_dl")
+        html_data = generate_html_report(target_portfolio, target_result, active_strat, "Target", required_daily, required_monthly)
+        st.download_button("🖨️ Download Master Plan (HTML)", data=html_data, file_name='BuckUnited_Master_Plan.html', mime='text/html', type="primary", key="target_dl")
