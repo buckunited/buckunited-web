@@ -2,7 +2,7 @@ import streamlit as st
 import datetime
 import plotly.graph_objects as go
 
-# --- CORE MATH ENGINE ---
+# --- CORE MATH ENGINE (UPDATED TO TRACK ACTIVE DEBTS & BASELINES) ---
 def calculate_payoff(debts, monthly_budget, strategy="avalanche"):
     if not debts: return {"error": "No debts"}
     
@@ -13,10 +13,14 @@ def calculate_payoff(debts, monthly_budget, strategy="avalanche"):
     
     balances = {d['name']: d['balance'] for d in sorted_debts}
     aprs = {d['name']: d['apr'] for d in sorted_debts}
+    starting_total = sum(balances.values())
 
     while sum(balances.values()) > 0:
         months_elapsed += 1
         remaining_budget = monthly_budget
+        
+        # Track exactly which debts are still active at the start of this month
+        active_this_month = [name for name, bal in balances.items() if bal > 0]
         
         for name in balances:
             if balances[name] > 0:
@@ -37,9 +41,18 @@ def calculate_payoff(debts, monthly_budget, strategy="avalanche"):
         if remaining_budget == monthly_budget and sum(balances.values()) > 0:
             return {"error": "Budget too low"}
 
-        timeline.append({"month": months_elapsed, "remaining_total_debt": round(sum(balances.values()), 2)})
+        timeline.append({
+            "month": months_elapsed, 
+            "remaining_total_debt": round(sum(balances.values()), 2),
+            "active_debts": ", ".join(active_this_month)
+        })
 
-    return {"months_to_freedom": months_elapsed, "total_interest_paid": round(total_interest, 2), "timeline": timeline}
+    return {
+        "starting_total_debt": round(starting_total, 2),
+        "months_to_freedom": months_elapsed, 
+        "total_interest_paid": round(total_interest, 2), 
+        "timeline": timeline
+    }
 
 def find_required_budget(debts, target_months, strategy="avalanche"):
     if not debts: return 0
@@ -64,25 +77,38 @@ def find_required_budget(debts, target_months, strategy="avalanche"):
             
     return best_budget
 
-# --- PREMIUM HYBRID HTML REPORT GENERATOR ---
+# --- PREMIUM HYBRID HTML REPORT GENERATOR (WITH PORTFOLIO & VISIBLE DEBT NAMES) ---
 def generate_html_report(portfolio, result, strategy, view_mode, required_daily=0, required_monthly=0):
-    # 1. Build the dynamic rows (Using Design 1's structured table layout)
+    
+    # 1. Build the dynamic Portfolio Included list
+    portfolio_rows = ""
+    for debt in portfolio:
+        portfolio_rows += f"""
+        <tr>
+            <td class="text-sm text-gray-800 font-medium">{debt['name']}</td>
+            <td class="text-sm text-center text-gray-600">{debt['apr']}%</td>
+            <td class="text-sm font-mono text-[#1a233a] text-right">${debt['balance']:,.2f}</td>
+        </tr>
+        """
+
+    # 2. Build the dynamic Execution Checklist rows (With active debt names mapped)
     table_rows = ""
     for item in result['timeline']:
         table_rows += f"""
         <tr class="blank-row">
             <td class="text-center text-gray-400 text-lg">☐</td>
             <td class="text-center text-sm">Month {item['month']}</td>
-            <td class="text-center font-mono text-sm">${item['remaining_total_debt']:,.2f}</td>
+            <td class="text-sm text-gray-600 font-medium px-2">{item['active_debts']}</td>
+            <td class="text-center font-mono text-sm text-[#1a233a]">${item['remaining_total_debt']:,.2f}</td>
             <td></td>
         </tr>
         """
 
-    # 2. Handle the Target vs Standard view numbers
+    # 3. Handle the Target vs Standard view numbers
     daily_str = f"${required_daily:,.2f}" if view_mode == "Target" else "N/A"
     monthly_str = f"${required_monthly:,.2f}" if view_mode == "Target" else "N/A"
 
-    # 3. Inject into the Hybrid Template
+    # 4. Inject into the Hybrid Template
     html_content = f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -92,11 +118,9 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
         <title>BuckUnited Master Plan</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <style>
-            /* Base styling */
             body {{ background-color: #e5e7eb; display: flex; justify-content: center; padding: 2rem; font-family: 'Helvetica Neue', sans-serif; color: #1f2937; }}
             .a4-sheet {{ width: 210mm; min-height: 297mm; background: white; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); padding: 15mm 20mm; position: relative; margin-bottom: 2rem; }}
             
-            /* Print rules to handle 30+ months perfectly */
             @media print {{
                 body {{ background: white; padding: 0; }}
                 .a4-sheet {{ width: 210mm; height: 297mm; box-shadow: none; margin: 0; padding: 15mm; page-break-after: always; }}
@@ -105,14 +129,17 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
                 tr {{ page-break-inside: avoid; }} 
             }}
             
-            /* Strict Table Styling */
             table {{ width: 100%; border-collapse: collapse; margin-top: 5px; }}
             th, td {{ border: 1px solid #9ca3af; padding: 6px 8px; text-align: left; font-size: 0.875rem; }}
             th {{ background-color: #f3f4f6; font-weight: bold; color: #374151; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }}
             .blank-row td {{ height: 31px; }}
             .fill-line {{ border-bottom: 1px solid #6b7280; flex-grow: 1; margin-left: 8px; }}
+
+            .portfolio-table {{ width: 100%; border-collapse: collapse; margin-top: 0; border: none; }}
+            .portfolio-table th, .portfolio-table td {{ border: none; border-bottom: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; }}
+            .portfolio-table th {{ background-color: #f8fafc; font-weight: bold; color: #475569; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; }}
+            .portfolio-table tr:last-child td {{ border-bottom: none; }}
             
-            /* The Watermark */
             .watermark-container {{ position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); width: 80%; text-align: center; opacity: 0.05; pointer-events: none; z-index: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }}
             .watermark-main {{ font-size: 8rem; font-weight: 900; color: #111827; letter-spacing: -0.05em; line-height: 1; white-space: nowrap; }}
             .watermark-sub {{ font-size: 2rem; font-weight: 700; color: #374151; letter-spacing: 0.3em; text-transform: uppercase; margin-top: -10px; }}
@@ -146,25 +173,45 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
                 <h2 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Strategy Overview</h2>
                 <div class="grid grid-cols-2 gap-x-12 gap-y-4 mb-6 bg-gray-50 p-4 border border-gray-200 rounded-sm">
                     <div class="flex items-end">
-                        <span class="font-bold text-sm whitespace-nowrap w-28">Methodology:</span>
+                        <span class="font-bold text-sm whitespace-nowrap w-36 text-gray-700">Methodology:</span>
                         <span class="text-sm ml-2 font-medium text-gray-800">{strategy.title()}</span>
                     </div>
                     <div class="flex items-end">
-                        <span class="font-bold text-sm whitespace-nowrap w-28">Daily Target:</span>
+                        <span class="font-bold text-sm whitespace-nowrap w-36 text-gray-700">Daily Target:</span>
                         <span class="text-sm ml-2 font-medium text-gray-800">{daily_str}</span>
                     </div>
                     <div class="flex items-end">
-                        <span class="font-bold text-sm whitespace-nowrap w-28">Timeline:</span>
+                        <span class="font-bold text-sm whitespace-nowrap w-36 text-gray-700">Timeline:</span>
                         <span class="text-sm ml-2 font-medium text-gray-800">{result['months_to_freedom']} Months</span>
                     </div>
                     <div class="flex items-end">
-                        <span class="font-bold text-sm whitespace-nowrap w-28">Monthly Target:</span>
+                        <span class="font-bold text-sm whitespace-nowrap w-36 text-gray-700">Monthly Target:</span>
                         <span class="text-sm ml-2 font-medium text-gray-800">{monthly_str}</span>
                     </div>
                     <div class="flex items-end">
-                        <span class="font-bold text-sm whitespace-nowrap w-28">Total Interest:</span>
+                        <span class="font-bold text-sm whitespace-nowrap w-36 text-gray-700">Total Starting Debt:</span>
+                        <span class="text-sm ml-2 font-bold text-indigo-600">${result['starting_total_debt']:,.2f}</span>
+                    </div>
+                    <div class="flex items-end">
+                        <span class="font-bold text-sm whitespace-nowrap w-36 text-gray-700">Total Interest Paid:</span>
                         <span class="text-sm ml-2 font-medium text-gray-800">${result['total_interest_paid']:,.2f}</span>
                     </div>
+                </div>
+
+                <h2 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Portfolio Included</h2>
+                <div class="border border-gray-200 rounded-sm mb-6 bg-white">
+                    <table class="portfolio-table m-0">
+                        <thead>
+                            <tr>
+                                <th>Liability Name</th>
+                                <th class="text-center">Interest Rate (APR)</th>
+                                <th class="text-right">Starting Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {portfolio_rows}
+                        </tbody>
+                    </table>
                 </div>
 
                 <h2 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Execution Checklist</h2>
@@ -173,6 +220,7 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
                         <tr>
                             <th class="w-12 text-center">Status</th>
                             <th class="w-24 text-center">Timeline</th>
+                            <th class="w-48 text-left px-2">Active Payoffs</th>
                             <th class="w-32 text-center">Remaining Debt</th>
                             <th class="w-auto text-left">Notes / Actual Paid</th>
                         </tr>
@@ -192,8 +240,8 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
     """
     return html_content.encode('utf-8')
 
-# --- PREMIUM INTERACTIVE GRAPH ---
-def draw_pro_chart(timeline):
+# --- PREMIUM INTERACTIVE GRAPH (WITH UNIQUE SESSION KEY TO FORCE REAL-TIME DRAWS) ---
+def draw_pro_chart(timeline, chart_key):
     months = [t['month'] for t in timeline]
     balances = [t['remaining_total_debt'] for t in timeline]
     
@@ -217,7 +265,7 @@ def draw_pro_chart(timeline):
         hovermode="x unified",
         font=dict(color='#94A3B8')
     )
-    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}) 
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key=chart_key) 
 
 # --- UI SETUP ---
 st.set_page_config(page_title="BuckUnited Intake", layout="wide")
@@ -275,9 +323,9 @@ if len(st.session_state.portfolio) > 0:
     active_strat = "avalanche" if "Avalanche" in strat_key else "snowball"
     
     if active_strat == "avalanche":
-        st.info("🏔️ **The Avalanche Method:** Targets your highest interest rate first. This is mathematically the fastest and cheapest way out of debt, but it might take longer to see your first account hit zero.")
+        st.info("🏔️ **The Avalanche Method:** Targets your highest interest rate first. This is mathematically the fastest and cheapest way out of debt.")
     else:
-        st.info("⛄ **The Snowball Method:** Targets your smallest balance first, regardless of interest. This gives you quick psychological victories by closing accounts faster, keeping you motivated.")
+        st.info("⛄ **The Snowball Method:** Targets your smallest balance first, regardless of interest. This gives you quick psychological victories.")
     
     st.write("") 
     col_btn1, col_btn2 = st.columns(2)
@@ -299,11 +347,12 @@ if len(st.session_state.portfolio) > 0:
         if "error" in result:
             st.error("Budget too low to cover accruing interest.")
         else:
-            c1, c2 = st.columns(2)
+            c0, c1, c2 = st.columns(3)
+            c0.metric("Starting Total Debt", f"${result['starting_total_debt']:,.2f}")
             c1.metric("Months to Debt-Free", result['months_to_freedom'])
-            c2.metric("Total Interest Paid", f"${result['total_interest_paid']}")
+            c2.metric("Total Interest Paid", f"${result['total_interest_paid']:,.2f}")
             
-            draw_pro_chart(result['timeline'])
+            draw_pro_chart(result['timeline'], chart_key=f"standard_chart_{active_strat}_{user_budget}")
             
             st.divider()
             st.markdown("### 🖨️ Your Action Plan")
@@ -324,13 +373,15 @@ if len(st.session_state.portfolio) > 0:
         future_date = datetime.date.today() + datetime.timedelta(days=target_months * 30.4)
         
         st.success(f"To pay off **{selected_view}** by **{future_date.strftime('%B %Y')}**, you need to hit this target:")
-        c1, c2 = st.columns(2)
-        c1.metric("Your Daily Micro-Target", f"${required_daily:.2f} / day")
-        c2.metric("Required Monthly Equivalent", f"${required_monthly:.2f} / mo")
+        c0, c1, c2 = st.columns(3)
+        c0.metric("Your Daily Micro-Target", f"${required_daily:.2f} / day")
+        c1.metric("Required Monthly Equivalent", f"${required_monthly:.2f} / mo")
         
         target_result = calculate_payoff(target_portfolio, required_monthly, active_strat)
+        c2.metric("Starting Total Debt", f"${target_result['starting_total_debt']:,.2f}")
         
-        draw_pro_chart(target_result['timeline'])
+        # Unique composite key guarantees immediate graphical update when dropdown shifts
+        draw_pro_chart(target_result['timeline'], chart_key=f"target_chart_{selected_view.replace(' ', '_')}_{active_strat}_{target_months}")
 
         st.divider()
         st.markdown("### 🖨️ Your Action Plan")
