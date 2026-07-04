@@ -2,7 +2,7 @@ import streamlit as st
 import datetime
 import plotly.graph_objects as go
 
-# --- CORE MATH ENGINE (UPDATED TO TRACK ACTIVE DEBTS & BASELINES) ---
+# --- CORE MATH ENGINE (CRASH-PROOF) ---
 def calculate_payoff(debts, monthly_budget, strategy="avalanche"):
     if not debts: return {"error": "No debts"}
     
@@ -17,17 +17,28 @@ def calculate_payoff(debts, monthly_budget, strategy="avalanche"):
 
     while sum(balances.values()) > 0:
         months_elapsed += 1
-        remaining_budget = monthly_budget
         
-        # Track exactly which debts are still active at the start of this month
+        # FATAL CRASH GUARD: If it takes over 100 years, kill the loop.
+        if months_elapsed > 1200:
+            return {"error": "Budget too low"}
+            
+        remaining_budget = monthly_budget
         active_this_month = [name for name, bal in balances.items() if bal > 0]
         
+        # 1. Apply Interest
+        monthly_interest_generated = 0
         for name in balances:
             if balances[name] > 0:
                 interest = balances[name] * ((aprs[name] / 100) / 12)
                 balances[name] += interest
+                monthly_interest_generated += interest
                 total_interest += interest
 
+        # CRASH GUARD: If budget can't even cover the interest, it will loop forever. Stop immediately.
+        if remaining_budget <= monthly_interest_generated and sum(balances.values()) > 0:
+            return {"error": "Budget too low"}
+
+        # 2. Make Payments
         for name in balances:
             if balances[name] <= 0: continue
             if remaining_budget >= balances[name]:
@@ -37,9 +48,6 @@ def calculate_payoff(debts, monthly_budget, strategy="avalanche"):
                 balances[name] -= remaining_budget
                 remaining_budget = 0
                 break
-
-        if remaining_budget == monthly_budget and sum(balances.values()) > 0:
-            return {"error": "Budget too low"}
 
         timeline.append({
             "month": months_elapsed, 
@@ -77,10 +85,9 @@ def find_required_budget(debts, target_months, strategy="avalanche"):
             
     return best_budget
 
-# --- PREMIUM HYBRID HTML REPORT GENERATOR (WITH PORTFOLIO & VISIBLE DEBT NAMES) ---
+# --- PREMIUM HYBRID HTML REPORT GENERATOR ---
 def generate_html_report(portfolio, result, strategy, view_mode, required_daily=0, required_monthly=0):
     
-    # 1. Build the dynamic Portfolio Included list
     portfolio_rows = ""
     for debt in portfolio:
         portfolio_rows += f"""
@@ -91,7 +98,6 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
         </tr>
         """
 
-    # 2. Build the dynamic Execution Checklist rows (With active debt names mapped)
     table_rows = ""
     for item in result['timeline']:
         table_rows += f"""
@@ -104,11 +110,9 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
         </tr>
         """
 
-    # 3. Handle the Target vs Standard view numbers
     daily_str = f"${required_daily:,.2f}" if view_mode == "Target" else "N/A"
     monthly_str = f"${required_monthly:,.2f}" if view_mode == "Target" else "N/A"
 
-    # 4. Inject into the Hybrid Template
     html_content = f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -120,7 +124,6 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
         <style>
             body {{ background-color: #e5e7eb; display: flex; justify-content: center; padding: 2rem; font-family: 'Helvetica Neue', sans-serif; color: #1f2937; }}
             .a4-sheet {{ width: 210mm; min-height: 297mm; background: white; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); padding: 15mm 20mm; position: relative; margin-bottom: 2rem; }}
-            
             @media print {{
                 body {{ background: white; padding: 0; }}
                 .a4-sheet {{ width: 210mm; height: 297mm; box-shadow: none; margin: 0; padding: 15mm; page-break-after: always; }}
@@ -128,18 +131,15 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
                 .no-print {{ display: none !important; }}
                 tr {{ page-break-inside: avoid; }} 
             }}
-            
             table {{ width: 100%; border-collapse: collapse; margin-top: 5px; }}
             th, td {{ border: 1px solid #9ca3af; padding: 6px 8px; text-align: left; font-size: 0.875rem; }}
             th {{ background-color: #f3f4f6; font-weight: bold; color: #374151; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }}
             .blank-row td {{ height: 31px; }}
             .fill-line {{ border-bottom: 1px solid #6b7280; flex-grow: 1; margin-left: 8px; }}
-
             .portfolio-table {{ width: 100%; border-collapse: collapse; margin-top: 0; border: none; }}
             .portfolio-table th, .portfolio-table td {{ border: none; border-bottom: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; }}
             .portfolio-table th {{ background-color: #f8fafc; font-weight: bold; color: #475569; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; }}
             .portfolio-table tr:last-child td {{ border-bottom: none; }}
-            
             .watermark-container {{ position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); width: 80%; text-align: center; opacity: 0.05; pointer-events: none; z-index: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }}
             .watermark-main {{ font-size: 8rem; font-weight: 900; color: #111827; letter-spacing: -0.05em; line-height: 1; white-space: nowrap; }}
             .watermark-sub {{ font-size: 2rem; font-weight: 700; color: #374151; letter-spacing: 0.3em; text-transform: uppercase; margin-top: -10px; }}
@@ -152,13 +152,11 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
                 🖨️ Print Master Plan
             </button>
         </div>
-
         <div class="a4-sheet">
             <div class="watermark-container">
                 <div class="watermark-main">BUCKUNITED</div>
                 <div class="watermark-sub">FINANCIAL</div>
             </div>
-            
             <div class="content-layer">
                 <div class="border-b-2 border-gray-800 pb-2 mb-4 flex justify-between items-end">
                     <div>
@@ -229,7 +227,6 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
                         {table_rows}
                     </tbody>
                 </table>
-                
                 <div class="mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-500">
                     <p>Track your live progress and visualize your trajectory at <b>buckunited-web-km98v3cnxqxunrp4nj7ylr.streamlit.app</b></p>
                 </div>
@@ -240,7 +237,7 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
     """
     return html_content.encode('utf-8')
 
-# --- PREMIUM INTERACTIVE GRAPH (WITH UNIQUE SESSION KEY TO FORCE REAL-TIME DRAWS) ---
+# --- PREMIUM INTERACTIVE GRAPH ---
 def draw_pro_chart(timeline, chart_key):
     months = [t['month'] for t in timeline]
     balances = [t['remaining_total_debt'] for t in timeline]
@@ -345,7 +342,7 @@ if len(st.session_state.portfolio) > 0:
         result = calculate_payoff(st.session_state.portfolio, user_budget, active_strat)
         
         if "error" in result:
-            st.error("Budget too low to cover accruing interest.")
+            st.error("⚠️ The budget you set is too low to cover the compounding monthly interest. Your debt will never go down. Please increase your monthly payment.")
         else:
             c0, c1, c2 = st.columns(3)
             c0.metric("Starting Total Debt", f"${result['starting_total_debt']:,.2f}")
@@ -372,18 +369,21 @@ if len(st.session_state.portfolio) > 0:
         required_daily = required_monthly / 30.4 
         future_date = datetime.date.today() + datetime.timedelta(days=target_months * 30.4)
         
-        st.success(f"To pay off **{selected_view}** by **{future_date.strftime('%B %Y')}**, you need to hit this target:")
-        c0, c1, c2 = st.columns(3)
-        c0.metric("Your Daily Micro-Target", f"${required_daily:.2f} / day")
-        c1.metric("Required Monthly Equivalent", f"${required_monthly:.2f} / mo")
-        
         target_result = calculate_payoff(target_portfolio, required_monthly, active_strat)
-        c2.metric("Starting Total Debt", f"${target_result['starting_total_debt']:,.2f}")
         
-        # Unique composite key guarantees immediate graphical update when dropdown shifts
-        draw_pro_chart(target_result['timeline'], chart_key=f"target_chart_{selected_view.replace(' ', '_')}_{active_strat}_{target_months}")
+        # CRASH GUARD FOR TARGET VIEW
+        if "error" in target_result:
+            st.error("⚠️ Mathematical limit reached. Either the timeline is too aggressive, or the budget required is too high. Please extend your timeline.")
+        else:
+            st.success(f"To pay off **{selected_view}** by **{future_date.strftime('%B %Y')}**, you need to hit this target:")
+            c0, c1, c2 = st.columns(3)
+            c0.metric("Your Daily Micro-Target", f"${required_daily:.2f} / day")
+            c1.metric("Required Monthly Equivalent", f"${required_monthly:.2f} / mo")
+            c2.metric("Starting Total Debt", f"${target_result['starting_total_debt']:,.2f}")
+            
+            draw_pro_chart(target_result['timeline'], chart_key=f"target_chart_{selected_view.replace(' ', '_')}_{active_strat}_{target_months}")
 
-        st.divider()
-        st.markdown("### 🖨️ Your Action Plan")
-        html_data = generate_html_report(target_portfolio, target_result, active_strat, "Target", required_daily, required_monthly)
-        st.download_button("🖨️ Download Master Plan (HTML)", data=html_data, file_name='BuckUnited_Master_Plan.html', mime='text/html', type="primary", key="target_dl")
+            st.divider()
+            st.markdown("### 🖨️ Your Action Plan")
+            html_data = generate_html_report(target_portfolio, target_result, active_strat, "Target", required_daily, required_monthly)
+            st.download_button("🖨️ Download Master Plan (HTML)", data=html_data, file_name='BuckUnited_Master_Plan.html', mime='text/html', type="primary", key="target_dl")
