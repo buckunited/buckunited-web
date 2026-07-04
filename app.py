@@ -113,6 +113,7 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
     daily_str = f"${required_daily:,.2f}" if view_mode == "Target" else "N/A"
     monthly_str = f"${required_monthly:,.2f}" if view_mode == "Target" else "N/A"
 
+    # Fully syntax-escaped HTML F-string
     html_content = f"""
     <!DOCTYPE html>
     <html lang="en">
