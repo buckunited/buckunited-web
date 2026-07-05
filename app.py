@@ -109,7 +109,7 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
     # Logic to handle target strings based on view mode
     if view_mode == "Standard":
         monthly_str = f"${required_monthly:,.2f}"
-        daily_str = "N/A (Standard View)"
+        daily_str = "N/A"
     else:
         monthly_str = f"${required_monthly:,.2f}"
         daily_str = f"${required_daily:,.2f}"
