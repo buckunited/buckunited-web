@@ -356,26 +356,19 @@ if len(st.session_state.portfolio) > 0:
         if 'budget' not in st.session_state:
             st.session_state.budget = 500.0
 
-        # 2. Sync Logic
-        # We define functions that update the master 'budget' state
-        def on_change_slider():
-            st.session_state.budget = st.session_state.slider_key
-
-        def on_change_input():
-            st.session_state.budget = st.session_state.input_key
-
-        # 3. Create Columns
+        # 2. Create Layout
         col_slide, col_num = st.columns([3, 1])
         
+        # 3. Widgets bound to the EXACT same session_state.budget key
+        # When you change one, it updates the state, and the other redraws automatically.
         with col_slide:
             st.slider(
                 "Target Monthly Payoff Budget ($)", 
                 min_value=100.0, 
                 max_value=50000.0, 
-                value=st.session_state.budget, 
+                value=float(st.session_state.budget), 
                 step=100.0,
-                key="slider_key",
-                on_change=on_change_slider
+                key="budget"
             )
         
         with col_num:
@@ -383,13 +376,12 @@ if len(st.session_state.portfolio) > 0:
                 "Or type exact ($)", 
                 min_value=100.0, 
                 max_value=1000000.0, 
-                value=st.session_state.budget, 
+                value=float(st.session_state.budget), 
                 step=10.0,
-                key="input_key",
-                on_change=on_change_input
+                key="budget"
             )
 
-        # 4. Use the value
+        # 4. Use the synced value
         user_budget = st.session_state.budget
         result = calculate_payoff(st.session_state.portfolio, user_budget, active_strat)
         
