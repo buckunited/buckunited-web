@@ -415,14 +415,44 @@ if len(st.session_state.portfolio) > 0:
                 type="primary"
             )
             
-    # --- TARGET VIEW ---
+   # --- TARGET VIEW ---
     elif st.session_state.view_mode == "Target":
         st.markdown("### Reverse Engineer Your Freedom")
+        
+        # 1. Initialize State
+        if 'target_months_val' not in st.session_state:
+            st.session_state.target_months_val = 24
+
         dropdown_options = ["All Debts (Combined Portfolio)"] + [d['name'] for d in st.session_state.portfolio]
         selected_view = st.selectbox("Select Target Scope:", dropdown_options)
         
+        # 2. Toggle Mode
+        target_input_mode = st.radio(
+            "Input Method", 
+            ["Slider", "Custom Input"], 
+            horizontal=True, 
+            label_visibility="collapsed"
+        )
+
+        # 3. Dynamic Month Selection
+        if target_input_mode == "Slider":
+            st.session_state.target_months_val = st.slider(
+                "I want this completely paid off in (Months):", 
+                min_value=1, 
+                max_value=200, 
+                value=int(st.session_state.target_months_val)
+            )
+        else:
+            st.session_state.target_months_val = st.number_input(
+                "Enter exact months:", 
+                min_value=1, 
+                max_value=600, 
+                value=int(st.session_state.target_months_val)
+            )
+            
+        target_months = st.session_state.target_months_val
+        
         target_portfolio = st.session_state.portfolio if selected_view == "All Debts (Combined Portfolio)" else [d for d in st.session_state.portfolio if d['name'] == selected_view]
-        target_months = st.slider("I want this completely paid off in (Months):", 1, 200, 24, 1)
         
         required_monthly = find_required_budget(target_portfolio, target_months, active_strat)
         required_daily = required_monthly / 30.4 
@@ -444,4 +474,11 @@ if len(st.session_state.portfolio) > 0:
             st.divider()
             st.markdown("### 🖨️ Your Action Plan")
             html_data = generate_html_report(target_portfolio, target_result, active_strat, "Target", required_daily, required_monthly)
-            st.download_button("🖨️ Download Master Plan (HTML)", data=html_data, file_name='BuckUnited_Master_Plan.html', mime='text/html', type="primary", key="target_dl")
+            st.download_button(
+                label="🖨️ Download Master Plan (HTML)", 
+                data=html_data, 
+                file_name='BuckUnited_Master_Plan.html', 
+                mime='text/html', 
+                type="primary", 
+                key="target_dl"
+            )
