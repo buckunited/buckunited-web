@@ -352,18 +352,21 @@ if len(st.session_state.portfolio) > 0:
 
  # --- STANDARD VIEW ---
     if st.session_state.view_mode == "Standard":
-        # 1. Ensure the budget exists in the "Single Source of Truth"
+        # 1. Initialize budget if it doesn't exist
         if 'budget' not in st.session_state:
             st.session_state.budget = 500.0
 
-        # 2. Define sync callbacks
-        def slider_update():
-            st.session_state.budget = st.session_state.slider_key
-            
-        def input_update():
-            st.session_state.budget = st.session_state.input_key
+        # 2. Sync Logic with Force Rerun
+        def update_budget():
+            # If the slider changed, update budget
+            if st.session_state.slider_key != st.session_state.budget:
+                st.session_state.budget = st.session_state.slider_key
+            # If the number input changed, update budget
+            elif st.session_state.input_key != st.session_state.budget:
+                st.session_state.budget = st.session_state.input_key
+            st.rerun() # Force the UI to refresh immediately
 
-        # 3. Create the UI Layout
+        # 3. Create Columns
         col_slide, col_num = st.columns([3, 1])
         
         with col_slide:
@@ -371,10 +374,10 @@ if len(st.session_state.portfolio) > 0:
                 "Target Monthly Payoff Budget ($)", 
                 min_value=100.0, 
                 max_value=50000.0, 
-                value=st.session_state.budget, 
+                value=float(st.session_state.budget), 
                 step=100.0,
                 key="slider_key",
-                on_change=slider_update
+                on_change=update_budget
             )
         
         with col_num:
@@ -382,14 +385,14 @@ if len(st.session_state.portfolio) > 0:
                 "Or type exact ($)", 
                 min_value=100.0, 
                 max_value=1000000.0, 
-                value=st.session_state.budget, 
+                value=float(st.session_state.budget), 
                 step=10.0,
                 key="input_key",
-                on_change=input_update
+                on_change=update_budget
             )
 
-        # 4. Use the single source of truth for calculations
-        user_budget = st.session_state.budget
+        # 4. Use the synced budget for the math
+        user_budget = float(st.session_state.budget)
         result = calculate_payoff(st.session_state.portfolio, user_budget, active_strat)
         
         if "error" in result:
@@ -405,14 +408,13 @@ if len(st.session_state.portfolio) > 0:
             st.divider()
             st.markdown("### 🖨️ Your Action Plan")
             
-            # Using the safe generator function
             html_data = generate_html_report(st.session_state.portfolio, result, active_strat, "Standard", 0, user_budget)
-            
             st.download_button(
                 label="🖨️ Download Master Plan (HTML)", 
                 data=html_data, 
                 file_name="BuckUnited_Master_Plan.html", 
-                mime="text/html"
+                mime="text/html",
+                type="primary"
             )
             
     # --- TARGET VIEW ---
