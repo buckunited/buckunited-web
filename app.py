@@ -294,16 +294,28 @@ if 'portfolio' not in st.session_state:
 if 'view_mode' not in st.session_state:
     st.session_state.view_mode = "Standard"
 
-# --- SIDEBAR: INTAKE FORM ---
-st.sidebar.header("Intake: Add Debt")
-with st.sidebar.form("add_debt_form", clear_on_submit=True):
-    new_name = st.text_input("Debt Name")
-    new_balance = st.number_input("Total Balance ($)", min_value=0.0, step=100.0)
-    new_apr = st.number_input("APR (%)", min_value=0.0, step=0.1)
+# --- IMPROVED INTAKE SECTION ---
+with st.container(border=True):
+    st.subheader("➕ Add New Liability")
     
-    if st.form_submit_button("Add to Portfolio") and new_name:
-        st.session_state.portfolio.append({"name": new_name, "balance": new_balance, "apr": new_apr})
-        st.rerun()
+    # We use a form to keep the submission logic clean
+    with st.form("add_debt_form", clear_on_submit=True):
+        debt_name = st.text_input("Debt Name", placeholder="e.g., Chase Sapphire, Student Loan")
+        
+        # Put Balance and APR side-by-side to save space and prevent overlap
+        col1, col2 = st.columns(2)
+        with col1:
+            bal = st.number_input("Total Balance ($)", min_value=0.0, step=100.0, format="%.2f")
+        with col2:
+            apr = st.number_input("APR (%)", min_value=0.0, max_value=100.0, step=0.1, format="%.1f")
+            
+        # Make the button full-width and primary style
+        submitted = st.form_submit_button("Add to Portfolio", type="primary", use_container_width=True)
+        
+        if submitted and debt_name:
+            st.session_state.portfolio.append({"name": debt_name, "balance": bal, "apr": apr})
+            st.success(f"Added {debt_name}!")
+            st.rerun()
 
 # --- MAIN DASHBOARD: PORTFOLIO MANAGEMENT ---
 st.subheader("Your Current Portfolio")
