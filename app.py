@@ -81,7 +81,7 @@ def find_required_budget(debts, target_months, strategy="avalanche"):
             
     return best_budget
 
-# --- PREMIUM HTML REPORT GENERATOR (BULLETPROOF STRING REPLACEMENT) ---
+# --- PREMIUM HTML REPORT GENERATOR (UPDATED FOR BUCKUNITED) ---
 def generate_html_report(portfolio, result, strategy, view_mode, required_daily=0, required_monthly=0):
     
     portfolio_rows = ""
@@ -106,10 +106,14 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
         </tr>
         """
 
-    daily_str = f"${required_daily:,.2f}" if view_mode == "Target" else "N/A"
-    monthly_str = f"${required_monthly:,.2f}" if view_mode == "Target" else "N/A"
+    # Logic to handle target strings based on view mode
+    if view_mode == "Standard":
+        monthly_str = f"${required_monthly:,.2f}"
+        daily_str = "N/A (Standard View)"
+    else:
+        monthly_str = f"${required_monthly:,.2f}"
+        daily_str = f"${required_daily:,.2f}"
 
-    # STANDARD STRING: No "f" at the beginning, so Python ignores all CSS brackets.
     html_template = """
     <!DOCTYPE html>
     <html lang="en">
@@ -199,7 +203,7 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
                     </div>
                 </div>
 
-                <h2 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Portfolio Included</h2>
+                <h2 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Portfolio Included - __VIEW_MODE__ View</h2>
                 <div class="border border-gray-200 rounded-sm mb-6 bg-white">
                     <table class="portfolio-table m-0">
                         <thead>
@@ -248,6 +252,7 @@ def generate_html_report(portfolio, result, strategy, view_mode, required_daily=
     html_content = html_content.replace("__INTEREST__", f"${result['total_interest_paid']:,.2f}")
     html_content = html_content.replace("__PORTFOLIO_ROWS__", portfolio_rows)
     html_content = html_content.replace("__TABLE_ROWS__", table_rows)
+    html_content = html_content.replace("__VIEW_MODE__", view_mode)
 
     return html_content.encode('utf-8')
 
