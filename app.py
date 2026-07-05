@@ -352,18 +352,18 @@ if len(st.session_state.portfolio) > 0:
 
  # --- STANDARD VIEW ---
     if st.session_state.view_mode == "Standard":
-        # Initialize budget if it doesn't exist
+        # 1. Ensure the budget exists in the "Single Source of Truth"
         if 'budget' not in st.session_state:
             st.session_state.budget = 500.0
 
-        # Sync Functions
-        def sync_from_slider():
+        # 2. Define sync callbacks
+        def slider_update():
             st.session_state.budget = st.session_state.slider_key
-
-        def sync_from_number():
+            
+        def input_update():
             st.session_state.budget = st.session_state.input_key
 
-        # Create Columns
+        # 3. Create the UI Layout
         col_slide, col_num = st.columns([3, 1])
         
         with col_slide:
@@ -374,7 +374,7 @@ if len(st.session_state.portfolio) > 0:
                 value=st.session_state.budget, 
                 step=100.0,
                 key="slider_key",
-                on_change=sync_from_slider
+                on_change=slider_update
             )
         
         with col_num:
@@ -385,10 +385,10 @@ if len(st.session_state.portfolio) > 0:
                 value=st.session_state.budget, 
                 step=10.0,
                 key="input_key",
-                on_change=sync_from_number
+                on_change=input_update
             )
 
-        # Use the synced budget
+        # 4. Use the single source of truth for calculations
         user_budget = st.session_state.budget
         result = calculate_payoff(st.session_state.portfolio, user_budget, active_strat)
         
@@ -404,13 +404,15 @@ if len(st.session_state.portfolio) > 0:
             
             st.divider()
             st.markdown("### 🖨️ Your Action Plan")
+            
+            # Using the safe generator function
             html_data = generate_html_report(st.session_state.portfolio, result, active_strat, "Standard", 0, user_budget)
+            
             st.download_button(
-                "🖨️ Download Master Plan (HTML)", 
+                label="🖨️ Download Master Plan (HTML)", 
                 data=html_data, 
-                file_name='BuckUnited_Master_Plan.html', 
-                mime='text/html', 
-                type="primary"
+                file_name="BuckUnited_Master_Plan.html", 
+                mime="text/html"
             )
             
     # --- TARGET VIEW ---
