@@ -352,11 +352,12 @@ if len(st.session_state.portfolio) > 0:
 
 # --- STANDARD VIEW ---
     if st.session_state.view_mode == "Standard":
-        # 1. Ensure the budget exists in the single source of truth
+        # 1. Single Source of Truth
         if 'budget' not in st.session_state:
             st.session_state.budget = 500.0
 
-        # 2. Simplified sync: This updates the master state when either widget is changed
+        # 2. Sync Logic
+        # We define functions that update the master 'budget' state
         def on_change_slider():
             st.session_state.budget = st.session_state.slider_key
 
@@ -371,7 +372,7 @@ if len(st.session_state.portfolio) > 0:
                 "Target Monthly Payoff Budget ($)", 
                 min_value=100.0, 
                 max_value=50000.0, 
-                value=float(st.session_state.budget), 
+                value=st.session_state.budget, 
                 step=100.0,
                 key="slider_key",
                 on_change=on_change_slider
@@ -382,28 +383,29 @@ if len(st.session_state.portfolio) > 0:
                 "Or type exact ($)", 
                 min_value=100.0, 
                 max_value=1000000.0, 
-                value=float(st.session_state.budget), 
+                value=st.session_state.budget, 
                 step=10.0,
                 key="input_key",
                 on_change=on_change_input
             )
 
-        # 4. Use the value from the session state
+        # 4. Use the value
         user_budget = st.session_state.budget
         result = calculate_payoff(st.session_state.portfolio, user_budget, active_strat)
         
         if "error" in result:
-            st.error("⚠️ Budget is too low. Please increase your monthly payment.")
+            st.error("⚠️ Budget too low. Increase your monthly payment.")
         else:
             c0, c1, c2 = st.columns(3)
             c0.metric("Starting Total Debt", f"${result['starting_total_debt']:,.2f}")
             c1.metric("Months to Debt-Free", result['months_to_freedom'])
             c2.metric("Total Interest Paid", f"${result['total_interest_paid']:,.2f}")
             
-            draw_pro_chart(result['timeline'], chart_key=f"standard_chart_{active_strat}_{user_budget}")
+            draw_pro_chart(result['timeline'], chart_key=f"chart_{user_budget}")
             
             st.divider()
             st.markdown("### 🖨️ Your Action Plan")
+            
             html_data = generate_html_report(st.session_state.portfolio, result, active_strat, "Standard", 0, user_budget)
             st.download_button(
                 label="🖨️ Download Master Plan (HTML)", 
