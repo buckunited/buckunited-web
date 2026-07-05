@@ -350,38 +350,47 @@ if len(st.session_state.portfolio) > 0:
             st.rerun()
     st.divider()
 
-    # --- STANDARD VIEW ---
+   # --- STANDARD VIEW ---
     if st.session_state.view_mode == "Standard":
-        # Initialize the budget in session_state if it's not there
+        # 1. Initialize budget if it doesn't exist
         if 'budget' not in st.session_state:
             st.session_state.budget = 500.0
 
-        # Define columns for the layout
-        col_slide, col_num = st.columns([3, 1])
+        # 2. Define Sync Functions
+        def sync_from_slider():
+            st.session_state.budget = st.session_state.slider_key
 
-        # We use a key for both widgets. Updating one will update the other via session_state.
+        def sync_from_number():
+            st.session_state.budget = st.session_state.input_key
+
+        # 3. Create Columns
+        col_slide, col_num = st.columns([3, 1])
+        
         with col_slide:
-            st.session_state.budget = st.slider(
+            st.slider(
                 "Target Monthly Payoff Budget ($)", 
                 min_value=100.0, 
                 max_value=50000.0, 
-                value=float(st.session_state.budget), 
+                value=st.session_state.budget, 
                 step=100.0,
-                key="slider_key"
+                key="slider_key",
+                on_change=sync_from_slider
             )
         
         with col_num:
-            st.session_state.budget = st.number_input(
+            st.number_input(
                 "Or type exact ($)", 
                 min_value=100.0, 
                 max_value=1000000.0, 
-                value=float(st.session_state.budget), 
+                value=st.session_state.budget, 
                 step=10.0,
-                key="input_key"
+                key="input_key",
+                on_change=sync_from_number
             )
 
-        # Now pass the synced st.session_state.budget to the engine
-        result = calculate_payoff(st.session_state.portfolio, st.session_state.budget, active_strat)
+        # 4. Use the synced budget for the math
+        user_budget = st.session_state.budget
+        result = calculate_payoff(st.session_state.portfolio, user_budget, active_strat)
         
         if "error" in result:
             st.error("⚠️ The budget is too low to cover interest. Increase your monthly payment.")
@@ -391,12 +400,11 @@ if len(st.session_state.portfolio) > 0:
             c1.metric("Months to Debt-Free", result['months_to_freedom'])
             c2.metric("Total Interest Paid", f"${result['total_interest_paid']:,.2f}")
             
-            draw_pro_chart(result['timeline'], chart_key=f"standard_chart_{active_strat}_{st.session_state.budget}")
+            draw_pro_chart(result['timeline'], chart_key=f"standard_chart_{active_strat}_{user_budget}")
             
             st.divider()
             st.markdown("### 🖨️ Your Action Plan")
-            # Pass the budget to the HTML generator
-            html_data = generate_html_report(st.session_state.portfolio, result, active_strat, "Standard", 0, st.session_state.budget)
+            html_data = generate_html_report(st.session_state.portfolio, result, active_strat, "Standard", 0, user_budget)
             st.download_button("🖨️ Download Master Plan (HTML)", data=html_data, file_name='BuckUnited_Master_Plan.html', mime='text/html', type="primary")
             
     # --- TARGET VIEW ---
