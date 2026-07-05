@@ -352,15 +352,20 @@ if len(st.session_state.portfolio) > 0:
 
 # --- STANDARD VIEW ---
     if st.session_state.view_mode == "Standard":
-        # 1. Single Source of Truth
+        # 1. Initialize budget if it doesn't exist
         if 'budget' not in st.session_state:
             st.session_state.budget = 500.0
 
-        # 2. Create Layout
+        # 2. Sync Logic (updates the master budget from whichever widget was changed)
+        def sync_from_slider():
+            st.session_state.budget = st.session_state.slider_key
+
+        def sync_from_input():
+            st.session_state.budget = st.session_state.input_key
+
+        # 3. Create Columns
         col_slide, col_num = st.columns([3, 1])
         
-        # 3. Widgets bound to the EXACT same session_state.budget key
-        # When you change one, it updates the state, and the other redraws automatically.
         with col_slide:
             st.slider(
                 "Target Monthly Payoff Budget ($)", 
@@ -368,7 +373,8 @@ if len(st.session_state.portfolio) > 0:
                 max_value=50000.0, 
                 value=float(st.session_state.budget), 
                 step=100.0,
-                key="budget"
+                key="slider_key",
+                on_change=sync_from_slider
             )
         
         with col_num:
@@ -378,11 +384,12 @@ if len(st.session_state.portfolio) > 0:
                 max_value=1000000.0, 
                 value=float(st.session_state.budget), 
                 step=10.0,
-                key="budget"
+                key="input_key",
+                on_change=sync_from_input
             )
 
-        # 4. Use the synced value
-        user_budget = st.session_state.budget
+        # 4. Use the synced budget
+        user_budget = float(st.session_state.budget)
         result = calculate_payoff(st.session_state.portfolio, user_budget, active_strat)
         
         if "error" in result:
