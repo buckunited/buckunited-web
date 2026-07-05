@@ -352,13 +352,21 @@ if len(st.session_state.portfolio) > 0:
 
     # --- STANDARD VIEW ---
     if st.session_state.view_mode == "Standard":
-        # REPLACED: Changed st.slider to st.number_input for custom values
-        user_budget = st.number_input("Enter your exact Monthly Payoff Budget ($)", min_value=100.0, value=500.0, step=10.0)
+        # Creating a layout: 3 parts slider, 1 part number input
+        c_slide, c_num = st.columns([3, 1])
         
+        # We define a temporary variable to hold the value
+        default_val = 500.0
+        
+        with c_slide:
+            user_budget = st.slider("Target Monthly Payoff Budget ($)", 100, 1000000, int(default_val), 100)
+        with c_num:
+            user_budget = st.number_input("Or type exact ($)", min_value=100.0, value=float(user_budget), step=10.0)
+            
         result = calculate_payoff(st.session_state.portfolio, user_budget, active_strat)
         
         if "error" in result:
-            st.error("⚠️ The budget you set is too low to cover the compounding monthly interest. Your debt will never go down. Please increase your monthly payment.")
+            st.error("⚠️ The budget is too low to cover interest. Increase your monthly payment.")
         else:
             c0, c1, c2 = st.columns(3)
             c0.metric("Starting Total Debt", f"${result['starting_total_debt']:,.2f}")
@@ -371,6 +379,7 @@ if len(st.session_state.portfolio) > 0:
             st.markdown("### 🖨️ Your Action Plan")
             html_data = generate_html_report(st.session_state.portfolio, result, active_strat, "Standard", 0, user_budget)
             st.download_button("🖨️ Download Master Plan (HTML)", data=html_data, file_name='BuckUnited_Master_Plan.html', mime='text/html', type="primary")
+            
     # --- TARGET VIEW ---
     elif st.session_state.view_mode == "Target":
         st.markdown("### Reverse Engineer Your Freedom")
