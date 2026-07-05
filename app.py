@@ -401,7 +401,7 @@ if len(st.session_state.portfolio) > 0:
         selected_view = st.selectbox("Select Target Scope:", dropdown_options)
         
         target_portfolio = st.session_state.portfolio if selected_view == "All Debts (Combined Portfolio)" else [d for d in st.session_state.portfolio if d['name'] == selected_view]
-        target_months = st.slider("I want this completely paid off in (Months):", 1, 120, 24, 1)
+        target_months = st.slider("I want this completely paid off in (Months):", 1, 200, 24, 1)
         
         required_monthly = find_required_budget(target_portfolio, target_months, active_strat)
         required_daily = required_monthly / 30.4 
