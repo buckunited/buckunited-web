@@ -352,48 +352,21 @@ if len(st.session_state.portfolio) > 0:
 
 # --- STANDARD VIEW ---
     if st.session_state.view_mode == "Standard":
-        # 1. Initialize budget if it doesn't exist
-        if 'budget' not in st.session_state:
-            st.session_state.budget = 500.0
-
-        # 2. Sync Logic (updates the master budget from whichever widget was changed)
-        def sync_from_slider():
-            st.session_state.budget = st.session_state.slider_key
-
-        def sync_from_input():
-            st.session_state.budget = st.session_state.input_key
-
-        # 3. Create Columns
-        col_slide, col_num = st.columns([3, 1])
+        # A single, clean slider. 
+        # By setting the range to 100k, it covers almost any personal debt scenario.
+        user_budget = st.slider(
+            "Target Monthly Payoff Budget ($)", 
+            min_value=100.0, 
+            max_value=100000.0, 
+            value=500.0, 
+            step=100.0
+        )
         
-        with col_slide:
-            st.slider(
-                "Target Monthly Payoff Budget ($)", 
-                min_value=100.0, 
-                max_value=50000.0, 
-                value=float(st.session_state.budget), 
-                step=100.0,
-                key="slider_key",
-                on_change=sync_from_slider
-            )
-        
-        with col_num:
-            st.number_input(
-                "Or type exact ($)", 
-                min_value=100.0, 
-                max_value=1000000.0, 
-                value=float(st.session_state.budget), 
-                step=10.0,
-                key="input_key",
-                on_change=sync_from_input
-            )
-
-        # 4. Use the synced budget
-        user_budget = float(st.session_state.budget)
+        # Calculate result based on the slider value
         result = calculate_payoff(st.session_state.portfolio, user_budget, active_strat)
         
         if "error" in result:
-            st.error("⚠️ Budget too low. Increase your monthly payment.")
+            st.error("⚠️ Budget too low. Increase your monthly payment to clear interest.")
         else:
             c0, c1, c2 = st.columns(3)
             c0.metric("Starting Total Debt", f"${result['starting_total_debt']:,.2f}")
