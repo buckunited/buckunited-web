@@ -376,7 +376,7 @@ if len(st.session_state.portfolio) > 0:
             st.session_state.budget = st.slider(
                 "Target Monthly Payoff Budget ($)", 
                 min_value=100.0, 
-                max_value=50000.0, 
+                max_value=25000.0, 
                 value=float(st.session_state.budget), 
                 step=100.0
             )
@@ -439,7 +439,7 @@ if len(st.session_state.portfolio) > 0:
             st.session_state.target_months_val = st.slider(
                 "I want this completely paid off in (Months):", 
                 min_value=1, 
-                max_value=200, 
+                max_value=120, 
                 value=int(st.session_state.target_months_val)
             )
         else:
