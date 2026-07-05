@@ -352,7 +352,9 @@ if len(st.session_state.portfolio) > 0:
 
     # --- STANDARD VIEW ---
     if st.session_state.view_mode == "Standard":
-        user_budget = st.slider("Target Monthly Payoff Budget ($)", 100, 5000, 500, 50)
+        # REPLACED: Changed st.slider to st.number_input for custom values
+        user_budget = st.number_input("Enter your exact Monthly Payoff Budget ($)", min_value=100.0, value=500.0, step=10.0)
+        
         result = calculate_payoff(st.session_state.portfolio, user_budget, active_strat)
         
         if "error" in result:
@@ -367,9 +369,8 @@ if len(st.session_state.portfolio) > 0:
             
             st.divider()
             st.markdown("### 🖨️ Your Action Plan")
-            html_data = generate_html_report(st.session_state.portfolio, result, active_strat, "Standard")
+            html_data = generate_html_report(st.session_state.portfolio, result, active_strat, "Standard", 0, user_budget)
             st.download_button("🖨️ Download Master Plan (HTML)", data=html_data, file_name='BuckUnited_Master_Plan.html', mime='text/html', type="primary")
-
     # --- TARGET VIEW ---
     elif st.session_state.view_mode == "Target":
         st.markdown("### Reverse Engineer Your Freedom")
